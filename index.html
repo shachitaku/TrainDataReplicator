@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+  
+<script>
+ 
+// キャンバス
+var src_canvas; 
+var src_ctx;
+ 
+// イメージ
+var image;
+ 
+// 矩形用
+var MIN_WIDTH  = 3;
+var MIN_HEIGHT = 3;
+ 
+var rect_MousedownFlg = false;
+var rect_sx = 0;
+var rect_sy = 0;
+var rect_ex = 0;
+var rect_ey = 0;
+
+window.onload = function () {
+  sessionStorage.clear();
+
+  src_canvas = document.getElementById("SrcCanvas");
+  src_ctx = src_canvas.getContext("2d");    
+  
+  rec_canvas = document.getElementById("RecCanvas");
+  rec_ctx = rec_canvas.getContext("2d");
+  rec_canvas.width = rec_canvas.height = 1;   
+
+  res_canvas = document.getElementById("ResCanvas");
+  res_ctx = res_canvas.getContext("2d");
+  res_canvas.width = res_canvas.height = 1;  
+    
+  image = document.getElementById("img_source");       
+}
+
+//ショートカットキー
+document.onkeydown = function(e) {
+	if( event.which === 16 ){
+		save();
+	}
+	if( event.which === 17 ){
+		make();
+	}
+	if( event.which === 27 ){
+		clearStorage();
+	}
+	if( event.which === 8  ){
+		deleteLast();
+	}
+	if( event.which === 18 ){
+		download();
+	}
+};
+ 
+// 色の反転
+function getTurningAround(color) {
+ 
+ // 灰色は白にする 
+ if(color >= 88 && color <= 168){
+   return 255;
+ // 色を反転する  
+ }else{
+   return 255 - color;
+ }
+}
+ 
+function OnMousedown(event) {
+ 
+  rect_MousedownFlg = true;
+  
+  // 座標を求める
+  var rect = event.target.getBoundingClientRect();
+  rect_sx = rect_ex = event.clientX - rect.left;
+  rect_sy = rect_ey = event.clientY - rect.top; 
+  
+  // 矩形の枠色を反転させる  
+  var imagedata = src_ctx.getImageData(rect_sx, rect_sy, 1, 1);   
+  src_ctx.strokeStyle = 'rgb(' + getTurningAround(imagedata.data[0]) +
+                           ',' + getTurningAround(imagedata.data[1]) + 
+                           ',' + getTurningAround(imagedata.data[2]) + ')';  
+  // 線の太さ                         
+  src_ctx.lineWidth = 2; 
+  
+  // 矩形の枠線を点線にする
+  src_ctx.setLineDash([2, 3]);                             
+}
+ 
+function OnMousemove(event) {
+  
+  if(rect_MousedownFlg){
+    
+    // 座標を求める
+    var rect = event.target.getBoundingClientRect();
+    rect_ex = event.clientX - rect.left;
+    rect_ey = event.clientY - rect.top; 
+ 
+    // 元画像の再描画
+    src_ctx.drawImage(image,0,0);  
+    
+    // 矩形の描画
+    src_ctx.beginPath();
+ 
+      // 上
+      src_ctx.moveTo(rect_sx,rect_sy);
+      src_ctx.lineTo(rect_ex,rect_sy);
+ 
+      // 下
+      src_ctx.moveTo(rect_sx,rect_ey);
+      src_ctx.lineTo(rect_ex,rect_ey);
+ 
+      // 右
+      src_ctx.moveTo(rect_ex,rect_sy);
+      src_ctx.lineTo(rect_ex,rect_ey);
+ 
+      // 左
+      src_ctx.moveTo(rect_sx,rect_sy);
+      src_ctx.lineTo(rect_sx,rect_ey);
+ 
+    src_ctx.stroke();
+  }
+}
+ 
+function OnMouseup(event) {
+  
+  // キャンバスの範囲外は無効にする    
+  if(rect_sx === rect_ex && rect_sy === rect_ey){
+    // 初期化
+    src_ctx.drawImage(image,0,0); 
+    rect_sx = rect_ex = 0;
+    rect_sy = rect_ey = 0;   
+    rec_canvas.width = rec_canvas.height = 1; 
+  }
+  
+  // 矩形の画像を取得する
+  if(rect_MousedownFlg){
+    
+    // 矩形のサイズ
+    rec_canvas.width  = Math.abs(rect_sx - rect_ex);
+    rec_canvas.height = Math.abs(rect_sy - rect_ey);
+    
+    // 指定のサイズ以下は無効にする[3x3]
+    if(!(rec_canvas.width >= MIN_WIDTH && rec_canvas.height >= MIN_HEIGHT)){
+      // 初期化
+      src_ctx.drawImage(image,0,0); 
+      rect_sx = rect_ex = 0;
+      rect_sy = rect_ey = 0; 
+      rec_canvas.width = rec_canvas.height = 1;
+    }else{
+      // 矩形用キャンバスへ画像の転送
+      rec_ctx.drawImage(image,
+                        Math.min(rect_sx,rect_ex),Math.min(rect_sy,rect_ey),  
+                        Math.max(rect_sx - rect_ex,rect_ex - rect_sx),Math.max(rect_sy - rect_ey ,rect_ey - rect_sy),
+                        0,0,rec_canvas.width,rec_canvas.height);  
+    }
+  }
+  
+  rect_MousedownFlg = false;
+}
+  
+function onDragOver(event){ 
+  event.preventDefault(); 
+} 
+  
+function onDrop(event){
+  onAddFile(event);
+  event.preventDefault(); 
+}  
+ 
+// ユーザーによりファイルが追加された  
+function onAddFile(event) {
+  var files;
+  var reader = new FileReader();
+  
+  if(event.target.files){
+    files = event.target.files;
+  }else{ 
+    files = event.dataTransfer.files;   
+  }    
+ 
+  // ファイルが読み込まれた
+  reader.onload = function (event) {
+    
+    // イメージが読み込まれた
+    image.onload = function (){
+      src_canvas.width  = image.width;
+      src_canvas.height = image.height;
+        
+      // キャンバスに画像を描画
+      src_ctx.drawImage(image,0,0); 
+    };      
+       
+    // イメージが読み込めない
+    image.onerror  = function (){
+      alert('このファイルは読み込めません。');  
+    };
+ 
+    image.src = reader.result;       
+  };
+  
+  if (files[0]){    
+    reader.readAsDataURL(files[0]); 
+    document.getElementById("inputfile").value = '';
+  } 
+} 
+
+var imgNum = 0;
+function save() {
+    var base64 = rec_canvas.toDataURL();
+    sessionStorage.setItem(imgNum, base64);
+	imgNum += 1;
+}
+
+function make() {
+	// 距離のセパレーション
+	var multiplyingfactorx = document.getElementById("multfactorx").value;
+	var multiplyingfactory = document.getElementById("multfactory").value;
+
+	//imagesの中にsessionstorageのデータを入れる
+    var images = [];
+	for (var i = 0; i < imgNum; i++) {
+		var str_i = String(i);
+		images[i] = new Image();
+		images[i].src = window.sessionStorage.getItem(str_i);
+	}
+
+	//一番大きいサイズのものを見つける
+	var imagesWidth = [];
+	var imagesHeight = [];
+	for (var i in images) {
+		imagesWidth[i] = images[i].width;
+		imagesHeight[i] = images[i].height;
+	}
+	var biggestWidth = Math.max.apply(null, imagesWidth);
+	var biggestHeight = Math.max.apply(null, imagesHeight);
+
+	//縦個数
+	var verticalNum = document.getElementById("verticalnum").value;
+
+	//合成pngのサイズ
+	res_canvas.width  = biggestWidth * (imgNum) * multiplyingfactorx;
+	res_canvas.height = biggestHeight* (verticalNum) * multiplyingfactory;
+
+    var loadedCount = 1;
+    for (var i in images) {
+        images[i].addEventListener('load', function() {
+            if (loadedCount == images.length) {
+                var x = 0;
+                var y = 0;
+                for (var j in images) {
+					var randomNum = Math.floor(Math.random()*images.length);
+					var randomNum1 = Math.floor(Math.random()*images.length);
+					var randomNum2 = Math.floor(Math.random()*images.length);
+					var randomNum3 = Math.floor(Math.random()*images.length);
+					var randomNum4 = Math.floor(Math.random()*images.length);
+					var randomNum5 = Math.floor(Math.random()*images.length);
+                    res_ctx.drawImage(images[randomNum], x, biggestHeight*0*multiplyingfactory, images[randomNum].width, images[randomNum].height);
+					if (verticalNum >= 2) {res_ctx.drawImage(images[randomNum1], x, biggestHeight*1*multiplyingfactory, images[randomNum1].width, images[randomNum1].height);}
+					if (verticalNum >= 3) {res_ctx.drawImage(images[randomNum2], x, biggestHeight*2*multiplyingfactory, images[randomNum2].width, images[randomNum2].height);}
+					if (verticalNum >= 4) {res_ctx.drawImage(images[randomNum3], x, biggestHeight*3*multiplyingfactory, images[randomNum3].width, images[randomNum3].height);}
+					if (verticalNum >= 5) {res_ctx.drawImage(images[randomNum4], x, biggestHeight*4*multiplyingfactory, images[randomNum4].width, images[randomNum4].height);}
+					if (verticalNum >= 6) {res_ctx.drawImage(images[randomNum5], x, biggestHeight*5*multiplyingfactory, images[randomNum5].width, images[randomNum5].height);}
+					x += biggestWidth * multiplyingfactorx;
+                }
+            }
+            loadedCount++;
+        }, false);
+    }
+	//背景を白色に
+    res_ctx.fillStyle = 'rgb(255,255,255)';
+    res_ctx.fillRect(0, 0, res_canvas.width, res_canvas.height);
+
+}
+
+function download() {
+	var canvas = document.getElementById("ResCanvas");
+	//アンカータグを作成
+	var a = document.createElement('a');
+	//canvasをJPEG変換し、そのBase64文字列をhrefへセット
+	a.href = canvas.toDataURL('image/png', 0.85);
+	//ダウンロード時のファイル名を指定
+	a.download = 'bellmark.png';
+	//クリックイベントを発生させる
+	a.click();
+}
+
+function clearStorage() {
+	sessionStorage.clear();
+	imgNum = 0;
+}
+
+function deleteLast() {
+	var key = String(imgNum-1);
+	sessionStorage.removeItem(key)
+	imgNum -= 1;
+	}
+
+</script>
+</head>
+<body ondrop="onDrop(event);" ondragover="onDragOver(event);"> 
+  <input type="file" id="inputfile" accept="image/jpeg,image/png,image/gif,image/bmp,image/x-icon" onchange="onAddFile(event);">
+  <img id="img_source" style="display:none;">
+  <input type="button" value="追加" onclick="save()"/>
+  <input type="button" value="画像生成" onclick="make()"/>
+  <input type="button" value="保存" id="btn-download" onclick="download()"/>
+  x軸伸ばし
+  <input type="number" id="multfactorx" value="1" max="5">
+  y軸伸ばし
+  <input type="number" id="multfactory" value="1" max="5">
+  縦個数(何倍にするか)
+  <input type="number" id="verticalnum" value="4" max="6">
+  <input type="button" value="取り込み画像全初期化" onclick="clearStorage()"/>
+  <canvas id="SrcCanvas" onmousedown="OnMousedown(event);" onmousemove="OnMousemove(event);" onmouseup="OnMouseup(event);"></canvas>
+  <p>取り囲んだ画像</p>
+  <canvas id="RecCanvas"></canvas>  
+  <p>合成画像</p>
+  <canvas id="ResCanvas"></canvas>  
+</body>
+</html>
+ 
