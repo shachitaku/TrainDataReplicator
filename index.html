@@ -50,7 +50,7 @@ document.onkeydown = function(e) {
 	if( event.which === 27 ){
 		clearStorage();
 	}
-	if( event.which === 8  ){
+	if( event.which === 49  ){
 		deleteLast();
 	}
 	if( event.which === 18 ){
@@ -303,6 +303,11 @@ function deleteLast() {
 </script>
 </head>
 <body ondrop="onDrop(event);" ondragover="onDragOver(event);"> 
+  <p>
+    ショートカット(Mac):Shift=画像追加、Control=水増し画像作成、Option=水増し画像保存、1=一番最後の追加画像削除、Esc=全ての追加画像削除<br>
+    ChromeなどからデベロッパーツールのApplicationタブを見ながらだと、SessionStorageの中身が見れていい感じ。<br>
+    ただしOption押すと勝手に画像セーブするので注意。
+  </p>
   <input type="file" id="inputfile" accept="image/jpeg,image/png,image/gif,image/bmp,image/x-icon" onchange="onAddFile(event);">
   <img id="img_source" style="display:none;">
   <input type="button" value="追加" onclick="save()"/>
